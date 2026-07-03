@@ -282,11 +282,36 @@ h3 {
   background: #101820;
   border-radius: 8px;
   color: #d8efe8;
+  display: grid;
   font-size: 13px;
-  height: 220px;
+  gap: 10px;
+  height: 260px;
   line-height: 1.55;
   overflow: auto;
   padding: 12px;
+}
+
+.journal-entry {
+  background: #172634;
+  border: 1px solid #284052;
+  border-radius: 8px;
+  padding: 11px;
+}
+
+.journal-entry b {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.journal-entry span {
+  color: #9fc9bd;
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.journal-entry p {
+  margin-bottom: 0;
 }
 
 @media (max-width: 980px) {
