@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { Activity, AlertTriangle, BarChart3, FileText, Map, Radar, RefreshCw, Shield, WalletCards } from "lucide-vue-next";
+import { Activity, BarChart3, FileText, Map, Radar, RefreshCw, Shield, WalletCards } from "lucide-vue-next";
 
 const activeView = ref("dashboard");
 const query = ref("");
@@ -52,10 +52,9 @@ const risks = ref([
   ["单一主题集中", 71],
 ]);
 
-const logs = ref([
-  "09:30 启动全模块：宏观、资金、产业、技术、风险。",
-  "09:32 资金地图显示 AI硬件链流入占优。",
-  "09:35 风险雷达提示高位题材股不宜加仓。",
+const journalEntries = ref([
+  { id: "local-1", created_at: "09:30", title: "系统启动", symbol: null, decision: "观察", reason: "启动宏观、资金、产业、技术、风险模块。", review_status: "pending" },
+  { id: "local-2", created_at: "09:35", title: "高位题材风险提示", symbol: "高位题材股", decision: "控仓", reason: "风险雷达提示短线情绪股回撤风险上升。", review_status: "pending" },
 ]);
 
 const tabs = [
@@ -76,7 +75,10 @@ const filteredStocks = computed(() => {
 const strongSignals = computed(() => stocks.value.filter((stock) => stock.score >= 78).length);
 const activeRisks = computed(() => risks.value.filter((risk) => risk[1] > 60).length);
 
-onMounted(loadDashboardOverview);
+onMounted(async () => {
+  await loadDashboardOverview();
+  await loadJournalEntries();
+});
 
 async function loadDashboardOverview() {
   try {
@@ -84,11 +86,22 @@ async function loadDashboardOverview() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     applyOverview(await response.json());
     dataSource.value = "后端 API";
-    const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    const time = nowText();
     lastRefresh.value = time;
-    logs.value.unshift(`${time} 已从后端 API 加载驾驶舱数据。`);
+    prependLocalJournal("加载驾驶舱", null, "同步", "已从后端 API 加载驾驶舱数据。");
   } catch {
     dataSource.value = "演示数据";
+  }
+}
+
+async function loadJournalEntries() {
+  try {
+    const response = await fetch("/api/journal/entries");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    if (Array.isArray(payload.entries)) journalEntries.value = payload.entries;
+  } catch {
+    dataSource.value = dataSource.value === "后端 API" ? "后端 API / 本地日志" : "演示数据";
   }
 }
 
@@ -124,11 +137,30 @@ async function rescore() {
     const payload = await response.json();
     applyOverview(payload);
     dataSource.value = "后端 API";
-    const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    const time = nowText();
     lastRefresh.value = time;
-    logs.value.unshift(`${time} ${payload.rescore_note || "后端已重新计算驾驶舱评分。"}`);
+    await createJournalEntry({
+      title: "后端重新评分",
+      symbol: "AI Alpha",
+      decision: "同步",
+      reason: payload.rescore_note || "后端已重新计算驾驶舱评分。",
+    });
   } catch {
     localRescore();
+  }
+}
+
+async function createJournalEntry(entry) {
+  try {
+    const response = await fetch("/api/journal/entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    journalEntries.value.unshift(await response.json());
+  } catch {
+    prependLocalJournal(entry.title, entry.symbol, entry.decision, entry.reason);
   }
 }
 
@@ -136,10 +168,26 @@ function localRescore() {
   factors.value = factors.value.map(([name, score]) => [name, clamp(score + randomStep(4), 45, 96)]);
   stocks.value = stocks.value.map((stock) => ({ ...stock, score: clamp(stock.score + randomStep(3), 48, 94) }));
   funds.value = funds.value.map(([name, score]) => [name, clamp(score + randomStep(5), 35, 95)]);
-  const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  const time = nowText();
   lastRefresh.value = time;
   dataSource.value = "演示数据";
-  logs.value.unshift(`${time} 本地模拟重新评分：后端暂不可用。`);
+  prependLocalJournal("本地模拟重新评分", "AI Alpha", "同步", "后端暂不可用，已使用本地模拟评分。");
+}
+
+function prependLocalJournal(title, symbol, decision, reason) {
+  journalEntries.value.unshift({
+    id: `${Date.now()}-${title}`,
+    created_at: nowText(),
+    title,
+    symbol,
+    decision,
+    reason,
+    review_status: "pending",
+  });
+}
+
+function nowText() {
+  return new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
 
 function randomStep(range) {
@@ -155,7 +203,7 @@ function clamp(value, min, max) {
   <main class="shell">
     <section class="topbar">
       <div>
-        <p class="eyebrow">AI Alpha Ultimate 2.2 · {{ dataSource }}</p>
+        <p class="eyebrow">AI Alpha Ultimate 2.3 · {{ dataSource }}</p>
         <h1>投资决策驾驶舱</h1>
       </div>
       <button class="primary-button" @click="rescore">
@@ -179,7 +227,7 @@ function clamp(value, min, max) {
       <article class="metric"><span>雷达候选</span><strong>{{ filteredStocks.length }}</strong><small>{{ strongSignals }} 个强信号</small></article>
       <article class="metric"><span>资金热度</span><strong>{{ funds[0][1] }}</strong><small>流入 AI 硬件</small></article>
       <article class="metric"><span>风险预警</span><strong>{{ activeRisks }}</strong><small class="risk">需复核</small></article>
-      <article class="metric"><span>最近刷新</span><strong class="time-text">{{ lastRefresh }}</strong><small>评分日志已记录</small></article>
+      <article class="metric"><span>日志记录</span><strong>{{ journalEntries.length }}</strong><small>待复盘 {{ journalEntries.filter((item) => item.review_status === 'pending').length }}</small></article>
     </section>
 
     <section v-if="activeView === 'dashboard'" class="workspace">
@@ -283,7 +331,13 @@ function clamp(value, min, max) {
 
     <section v-if="activeView === 'logs'" class="panel">
       <h2>AI 交易日志</h2>
-      <div class="log"><p v-for="item in logs" :key="item">{{ item }}</p></div>
+      <div class="log">
+        <article v-for="item in journalEntries" :key="item.id" class="journal-entry">
+          <b>{{ item.title }}</b>
+          <span>{{ item.created_at }} · {{ item.symbol || '账户' }} · {{ item.decision }} · {{ item.review_status }}</span>
+          <p>{{ item.reason }}</p>
+        </article>
+      </div>
     </section>
   </main>
 </template>
