@@ -117,13 +117,29 @@ function selectHolding(stock) {
   activeView.value = "portfolio";
 }
 
-function rescore() {
+async function rescore() {
+  try {
+    const response = await fetch("/api/dashboard/rescore", { method: "POST" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    applyOverview(payload);
+    dataSource.value = "后端 API";
+    const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    lastRefresh.value = time;
+    logs.value.unshift(`${time} ${payload.rescore_note || "后端已重新计算驾驶舱评分。"}`);
+  } catch {
+    localRescore();
+  }
+}
+
+function localRescore() {
   factors.value = factors.value.map(([name, score]) => [name, clamp(score + randomStep(4), 45, 96)]);
   stocks.value = stocks.value.map((stock) => ({ ...stock, score: clamp(stock.score + randomStep(3), 48, 94) }));
   funds.value = funds.value.map(([name, score]) => [name, clamp(score + randomStep(5), 35, 95)]);
   const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
   lastRefresh.value = time;
-  logs.value.unshift(`${time} 重新评分：资金地图、风险雷达、持仓评分已刷新。`);
+  dataSource.value = "演示数据";
+  logs.value.unshift(`${time} 本地模拟重新评分：后端暂不可用。`);
 }
 
 function randomStep(range) {
@@ -139,7 +155,7 @@ function clamp(value, min, max) {
   <main class="shell">
     <section class="topbar">
       <div>
-        <p class="eyebrow">AI Alpha Ultimate 2.1 · {{ dataSource }}</p>
+        <p class="eyebrow">AI Alpha Ultimate 2.2 · {{ dataSource }}</p>
         <h1>投资决策驾驶舱</h1>
       </div>
       <button class="primary-button" @click="rescore">
