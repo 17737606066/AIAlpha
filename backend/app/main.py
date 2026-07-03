@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import portfolio, reports, signals
+from app.routers import dashboard, portfolio, reports, signals
 
 app = FastAPI(title=settings.app_name)
 
@@ -14,6 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"])
 app.include_router(signals.router, prefix="/api/signals", tags=["signals"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
