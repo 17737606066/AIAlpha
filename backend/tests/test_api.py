@@ -37,6 +37,32 @@ def test_dashboard_rescore():
     assert payload["risks"]
 
 
+def test_journal_entries():
+    response = client.get("/api/journal/entries")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["entries"]
+
+
+def test_create_journal_entry():
+    response = client.post(
+        "/api/journal/entries",
+        json={
+            "title": "测试交易决策",
+            "symbol": "PCB核心",
+            "decision": "观察",
+            "reason": "评分较高，但需要确认资金持续性。",
+        },
+    )
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["id"]
+    assert payload["title"] == "测试交易决策"
+    assert payload["review_status"] == "pending"
+
+
 def test_morning_report():
     response = client.get("/api/reports/morning")
     payload = response.json()
