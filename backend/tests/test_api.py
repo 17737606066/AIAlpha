@@ -12,6 +12,19 @@ def test_health_check():
     assert response.json()["status"] == "ok"
 
 
+def test_dashboard_overview():
+    response = client.get("/api/dashboard/overview")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["account_score"] >= 80
+    assert payload["factors"]
+    assert payload["stocks"]
+    assert payload["funds"]
+    assert payload["risks"]
+    assert "morning_brief" in payload
+
+
 def test_morning_report():
     response = client.get("/api/reports/morning")
     payload = response.json()
