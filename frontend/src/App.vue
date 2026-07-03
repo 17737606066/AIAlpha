@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { Activity, AlertTriangle, BarChart3, FileText, Map, Radar, RefreshCw, Shield, WalletCards } from "lucide-vue-next";
 
 const activeView = ref("dashboard");
@@ -7,6 +7,14 @@ const query = ref("");
 const selectedHolding = ref(null);
 const reportExpanded = ref(false);
 const lastRefresh = ref("09:30:00");
+const dataSource = ref("演示数据");
+const marketTone = ref("中性偏强，AI硬件主线仍在，但分歧扩大。");
+const discipline = ref("只有资金与评分同时确认才加仓，避免情绪追涨。");
+const morningBrief = ref({
+  global: "美元、美债与科技股风险偏好共同影响 A股 AI主线。",
+  opportunities: ["PCB", "AI服务器", "先进封装", "HBM"],
+  account_action: "核心持仓继续观察，题材高位降低暴露。",
+});
 
 const factors = ref([
   ["基本面", 78],
@@ -68,6 +76,32 @@ const filteredStocks = computed(() => {
 const strongSignals = computed(() => stocks.value.filter((stock) => stock.score >= 78).length);
 const activeRisks = computed(() => risks.value.filter((risk) => risk[1] > 60).length);
 
+onMounted(loadDashboardOverview);
+
+async function loadDashboardOverview() {
+  try {
+    const response = await fetch("/api/dashboard/overview");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    applyOverview(await response.json());
+    dataSource.value = "后端 API";
+    const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    lastRefresh.value = time;
+    logs.value.unshift(`${time} 已从后端 API 加载驾驶舱数据。`);
+  } catch {
+    dataSource.value = "演示数据";
+  }
+}
+
+function applyOverview(payload) {
+  if (Array.isArray(payload.factors)) factors.value = payload.factors.map((item) => [item.name, item.score]);
+  if (Array.isArray(payload.stocks)) stocks.value = payload.stocks.map((stock) => ({ detail: "来自后端驾驶舱接口，等待接入实时行情与公告数据。", ...stock }));
+  if (Array.isArray(payload.funds)) funds.value = payload.funds.map((item) => [item.name, item.heat]);
+  if (Array.isArray(payload.risks)) risks.value = payload.risks.map((item) => [item.name, item.score]);
+  if (payload.market_tone) marketTone.value = payload.market_tone;
+  if (payload.discipline) discipline.value = payload.discipline;
+  if (payload.morning_brief) morningBrief.value = payload.morning_brief;
+}
+
 function scoreClass(score) {
   if (score >= 78) return "positive";
   if (score < 65) return "risk";
@@ -105,7 +139,7 @@ function clamp(value, min, max) {
   <main class="shell">
     <section class="topbar">
       <div>
-        <p class="eyebrow">AI Alpha Ultimate 2.0</p>
+        <p class="eyebrow">AI Alpha Ultimate 2.1 · {{ dataSource }}</p>
         <h1>投资决策驾驶舱</h1>
       </div>
       <button class="primary-button" @click="rescore">
@@ -143,9 +177,10 @@ function clamp(value, min, max) {
       </div>
       <div class="panel">
         <h2>今日总控</h2>
-        <p>中性偏强，AI硬件主线仍在，但分歧扩大。</p>
-        <p><span class="tag">AI服务器</span><span class="tag">PCB</span><span class="tag">先进封装</span><span class="tag">HBM</span></p>
-        <p>只有资金与评分同时确认才加仓，避免情绪追涨。</p>
+        <p>{{ marketTone }}</p>
+        <p><span v-for="item in morningBrief.opportunities" :key="item" class="tag">{{ item }}</span></p>
+        <p>{{ discipline }}</p>
+        <p>{{ morningBrief.account_action }}</p>
       </div>
     </section>
 
@@ -217,9 +252,9 @@ function clamp(value, min, max) {
     <section v-if="activeView === 'reports'" class="workspace">
       <div class="panel">
         <h2>今日投资晨报</h2>
-        <p>全球：美元、美债与科技股风险偏好共同影响 A股 AI主线。</p>
-        <p>A股：AI硬件链仍强，但资金分歧扩大。</p>
-        <p>机会：PCB、AI服务器、先进封装、HBM。</p>
+        <p>全球：{{ morningBrief.global }}</p>
+        <p>A股：{{ marketTone }}</p>
+        <p>机会：{{ morningBrief.opportunities.join('、') }}</p>
         <p v-if="reportExpanded">完整：若指数放量上行，优先看资金地图热度前三；若缩量震荡，控制仓位并等待回踩确认。</p>
       </div>
       <div class="panel">
