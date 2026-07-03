@@ -25,6 +25,18 @@ def test_dashboard_overview():
     assert "morning_brief" in payload
 
 
+def test_dashboard_rescore():
+    response = client.post("/api/dashboard/rescore")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["rescore_note"]
+    assert payload["rescored_at"]
+    assert payload["factors"]
+    assert payload["funds"]
+    assert payload["risks"]
+
+
 def test_morning_report():
     response = client.get("/api/reports/morning")
     payload = response.json()
